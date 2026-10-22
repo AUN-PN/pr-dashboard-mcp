@@ -1,11 +1,10 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
-import type { Dashboard, PullRequest, Summaries, Summary } from '../types'
+import type { Dashboard, PullRequest, SavedSummary, Summaries, Summary } from '../types'
 import { prRef } from './format'
 
 export const SUMMARY_MODEL = 'haiku'
 
-const STORE_KEY = 'summaries'
 const MAX_INPUT_CHARS = 12_000
 const MAX_SUMMARIES = 20
 const PARALLEL = 2
@@ -22,24 +21,29 @@ export function visiblePullRequests(data: Dashboard): PullRequest[] {
   return [...seen.values()]
 }
 
-async function loadStored($: EngineInterface): Promise<Summaries> {
-  const stored = await $.store.get(STORE_KEY).catch(() => undefined)
-  return stored && typeof stored === 'object' ? (stored as Summaries) : {}
+const isCurrent = (summary: Summary | undefined, pr: PullRequest): summary is Summary => summary?.updatedAt === pr.updatedAt
+
+export type SaveSummary = (pr: PullRequest, text: string) => Promise<void>
+
+export async function mergeShared($: EngineInterface, saved: readonly SavedSummary[]): Promise<void> {
+  await update($, summaries, (all) => {
+    const next = { ...all }
+    for (const s of saved) {
+      const ref = prRef(s)
+      const local = next[ref]
+      if (local?.status === 'ready' && local.updatedAt === s.updatedAt && local.text === s.text) continue
+      if (!local || s.updatedAt >= local.updatedAt) next[ref] = { status: 'ready', updatedAt: s.updatedAt, text: s.text }
+    }
+    return next
+  })
 }
 
-export async function restoreSummaries($: EngineInterface): Promise<Summaries> {
-  const stored = await loadStored($)
-  await update($, summaries, (all) => ({ ...stored, ...all }))
-  return read($, summaries)
-}
-
-async function persist($: EngineInterface, refs: Set<string>): Promise<void> {
-  const all = await read($, summaries)
-  const kept = Object.fromEntries(Object.entries(all).filter(([ref, s]) => refs.has(ref) && s.status === 'ready'))
-  await $.store.set(STORE_KEY, kept).catch(() => undefined)
-}
-
-async function summariseOne($: EngineInterface, pr: PullRequest, details: (pr: PullRequest) => Promise<string>) {
+async function summariseOne(
+  $: EngineInterface,
+  pr: PullRequest,
+  details: (pr: PullRequest) => Promise<string>,
+  save: SaveSummary,
+) {
   const ref = prRef(pr)
   let text: string | null = null
   try {
@@ -59,30 +63,35 @@ async function summariseOne($: EngineInterface, pr: PullRequest, details: (pr: P
     ? { status: 'ready', updatedAt: pr.updatedAt, text }
     : { status: 'failed', updatedAt: pr.updatedAt }
   await update($, summaries, (all) => ({ ...all, [ref]: summary }))
-  $.ui.invalidate('ui.render')
+  if (text) await save(pr, text).catch(() => undefined)
 }
 
 export async function summariseDashboard(
   $: EngineInterface,
   data: Dashboard,
   details: (pr: PullRequest) => Promise<string>,
+  save: SaveSummary,
 ): Promise<void> {
   const prs = visiblePullRequests(data).slice(0, MAX_SUMMARIES)
-  let current = await read($, summaries)
-  if (Object.keys(current).length === 0) current = await restoreSummaries($)
 
-  const stale = prs.filter((pr) => current[prRef(pr)]?.updatedAt !== pr.updatedAt)
-  if (stale.length === 0) return
-
-  const pending: Summaries = Object.fromEntries(
-    stale.map((pr): [string, Summary] => [prRef(pr), { status: 'pending', updatedAt: pr.updatedAt }]),
-  )
-  await update($, summaries, (all) => ({ ...all, ...pending }))
+  let stale: PullRequest[] = []
+  await update($, summaries, (all) => {
+    const kept: Summaries = {}
+    stale = []
+    for (const pr of prs) {
+      const own = all[prRef(pr)]
+      if (isCurrent(own, pr)) kept[prRef(pr)] = own
+      else stale.push(pr)
+    }
+    return {
+      ...kept,
+      ...Object.fromEntries(stale.map((pr): [string, Summary] => [prRef(pr), { status: 'pending', updatedAt: pr.updatedAt }])),
+    }
+  })
 
   const queue = [...stale]
   const worker = async () => {
-    for (let pr = queue.shift(); pr; pr = queue.shift()) await summariseOne($, pr, details)
+    for (let pr = queue.shift(); pr; pr = queue.shift()) await summariseOne($, pr, details, save)
   }
   await Promise.all(Array.from({ length: PARALLEL }, worker))
-  await persist($, new Set(prs.map(prRef)))
 }

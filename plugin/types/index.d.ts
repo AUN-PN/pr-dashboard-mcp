@@ -68,6 +68,15 @@ export type Summary =
 
 export type Summaries = Record<string, Summary>
 
+export type SavedSummary = PrRef & { updatedAt: string; text: string }
+
+export type LiveState = {
+  version: string
+  work: WorkItem[]
+  dashboard: Dashboard | null
+  summaries: SavedSummary[]
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'pr-dashboard': { dashboard: DashboardState; summaries: Summaries }
