@@ -1,8 +1,8 @@
 import type { Elements, RenderSurface } from 'claude-code'
-import type { Dashboard, DashboardState, PullRequest, RepoGroup, WorkEntry, WorkItem } from '../types'
+import type { Dashboard, DashboardState, InboxSection, InboxSectionId, PullRequest, WorkEntry, WorkItem } from '../types'
 import type { Actions } from './actions'
 import { age, plural, prRef, splitTicket, USER_ACTOR } from './format'
-import { avatar, pill, repoMark } from './svg'
+import { avatar, pill } from './svg'
 import { STATUS, SURFACE, TONES, type Tone } from './theme'
 
 export type ViewElements = Pick<Elements['desktop'], 'Box' | 'Text' | 'Button' | 'Link'> & {
@@ -18,7 +18,18 @@ const updated = (iso: string) => {
   return a === 'now' ? 'updated just now' : `updated ${a} ago`
 }
 
-const totalOpen = (data: Dashboard) => data.repos.reduce((n, g) => n + g.totalCount, 0)
+const totalOpen = (data: Dashboard) => data.sections.reduce((n, s) => n + s.pullRequests.length, 0)
+
+const sectionCount = (data: Dashboard, id: InboxSectionId) =>
+  data.sections.find((s) => s.id === id)?.pullRequests.length ?? 0
+
+const SECTION_TONE: Record<InboxSectionId, Tone> = {
+  review: 'info',
+  returned: 'danger',
+  ready: 'success',
+  waiting: 'warning',
+  drafts: 'draft',
+}
 
 export function renderDashboard(el: ViewElements, surface: RenderSurface, state: DashboardState, actions: Actions) {
   const { Box, Text, Button } = el
@@ -40,7 +51,7 @@ export function renderDashboard(el: ViewElements, surface: RenderSurface, state:
       {error !== null && renderNotice(ctx, error)}
       {data !== null && renderStats(ctx, data)}
       {data !== null && renderFocus(ctx, data)}
-      {data !== null && renderRepos(ctx, data)}
+      {data !== null && renderSections(ctx, data)}
     </Box>
   )
 }
@@ -63,13 +74,11 @@ function renderNotice({ el, rich }: Ctx, message: string) {
 
 function renderStats(ctx: Ctx, data: Dashboard) {
   const { Box, Text } = ctx.el
-  const prs = data.repos.flatMap((g) => g.pullRequests)
-  const count = (...s: PullRequest['status'][]) => prs.filter((p) => s.includes(p.status)).length
   const stats: Array<{ label: string; value: number; tone: Tone }> = [
-    { label: 'Open', value: totalOpen(data), tone: 'accent' },
-    { label: 'In review', value: count('review_requested', 'changes_requested'), tone: 'warning' },
-    { label: 'Failing', value: count('ci_failed'), tone: 'danger' },
-    { label: 'Ready', value: count('approved'), tone: 'success' },
+    { label: 'To review', value: sectionCount(data, 'review'), tone: SECTION_TONE.review },
+    { label: 'Returned', value: sectionCount(data, 'returned'), tone: SECTION_TONE.returned },
+    { label: 'Ready', value: sectionCount(data, 'ready'), tone: SECTION_TONE.ready },
+    { label: 'Waiting', value: sectionCount(data, 'waiting'), tone: SECTION_TONE.waiting },
   ]
 
   if (!ctx.rich) {
@@ -205,57 +214,42 @@ function renderWork(ctx: Ctx, { item, pullRequest: pr }: WorkEntry) {
   )
 }
 
-function renderRepos(ctx: Ctx, data: Dashboard) {
+function renderSections(ctx: Ctx, data: Dashboard) {
   const { Box, Text } = ctx.el
-  const busy = data.repos.filter((g) => g.error !== null || g.pullRequests.length > 0)
-  const quiet = data.repos.filter((g) => g.error === null && g.pullRequests.length === 0)
+  const filled = data.sections.filter((s) => s.pullRequests.length > 0)
 
-  if (data.repos.length === 0) {
+  if (filled.length === 0) {
     return (
       <Text key="empty" dimColor>
-        🎉 All clear. No repositories with pull requests involving you in the last 30 days.
+        🎉 All clear. Nothing waiting for your review and no open pull requests of yours.
       </Text>
     )
   }
 
   return (
-    <Box key="repos" flexDirection="column" gap="lg">
-      {busy.map((g) => renderRepo(ctx, g, data))}
-      {busy.length === 0 && <Text dimColor>🎉 All clear. Nothing open right now.</Text>}
-      {quiet.length > 0 && (
-        <Text dimColor size="footnote">
-          {`Quiet: ${quiet.map((g) => `${g.owner}/${g.repo}`).join(', ')}`}
-        </Text>
-      )}
+    <Box key="sections" flexDirection="column" gap="lg">
+      {filled.map((s) => renderSection(ctx, s, data))}
     </Box>
   )
 }
 
-function renderRepo(ctx: Ctx, group: RepoGroup, data: Dashboard) {
-  const { Box, Text, Link, Svg } = ctx.el
-  const name = `${group.owner}/${group.repo}`
-  const hidden = group.totalCount - group.pullRequests.length
-  const mark = repoMark(group.repo)
+function renderSection(ctx: Ctx, section: InboxSection, data: Dashboard) {
+  const { Box, Text } = ctx.el
+  const tone = TONES[SECTION_TONE[section.id]]
 
   return (
-    <Box key={`repo-${name}`} flexDirection="column" gap="sm">
+    <Box key={`section-${section.id}`} flexDirection="column" gap="sm">
       <Box flexDirection="row" alignItems="center" gap="sm">
-        {ctx.rich && Svg && <Svg source={mark.source} alt={group.repo} width={mark.width} height={mark.height} />}
-        <Box flexDirection="row" gap="xs" alignItems="center" flexGrow={1} flexShrink={1}>
-          <Text weight="semibold" bold>
-            {group.repo}
-          </Text>
-          <Text dimColor size="footnote">
-            {group.owner}
-          </Text>
-        </Box>
+        <Text size="caption" weight="semibold" color={ctx.rich ? tone.fg : tone.key} bold={!ctx.rich}>
+          {section.title.toUpperCase()}
+        </Text>
         <Text dimColor tabular size="footnote">
-          {group.error ? 'error' : String(group.totalCount)}
+          {String(section.pullRequests.length)}
         </Text>
       </Box>
-      {group.error !== null && renderNotice(ctx, group.error)}
-      {group.pullRequests.map((pr) => renderCard(ctx, pr, data.inProgress.filter((e) => prRef(e.item) === prRef(pr))))}
-      {hidden > 0 && <Link href={`https://github.com/${name}/pulls`}>{`See ${hidden} more on GitHub ↗`}</Link>}
+      {section.pullRequests.map((pr) =>
+        renderCard(ctx, pr, data.viewer, data.inProgress.filter((e) => prRef(e.item) === prRef(pr))),
+      )}
     </Box>
   )
 }
@@ -278,7 +272,7 @@ function renderStatus(ctx: Ctx, pr: PullRequest, key: string) {
   )
 }
 
-function renderCard(ctx: Ctx, pr: PullRequest, work: WorkEntry[]) {
+function renderCard(ctx: Ctx, pr: PullRequest, viewer: string | null, work: WorkEntry[]) {
   const { Box, Text, Button, Link, Svg } = ctx.el
   const ref = prRef(pr)
   const scope = `pr-${ref}`.slice(0, 64)
@@ -287,7 +281,8 @@ function renderCard(ctx: Ctx, pr: PullRequest, work: WorkEntry[]) {
   const isMine = work.some((e) => isUser(e.item))
   const workers = work.map((e) => who(e.item)).join(', ')
   const face = avatar(pr.author ?? '?')
-  const meta = [`#${pr.number}`, ticket, pr.author ? `@${pr.author}` : null, age(pr.updatedAt)].filter(Boolean).join(' · ')
+  const byOther = pr.author !== null && pr.author !== viewer
+  const meta = [`${pr.repo}#${pr.number}`, ticket, byOther ? `@${pr.author}` : null, age(pr.updatedAt)].filter(Boolean).join(' · ')
 
   const buttons = (
     <Box flexDirection="row" gap="sm" alignItems="center">
@@ -364,17 +359,18 @@ export function renderSummaryBar(el: ViewElements, surface: RenderSurface, state
         : { text: isLoading ? ' · loading…' : ' · open ›', dim: true },
     )
   } else {
-    const prs = data.repos.flatMap((g) => g.pullRequests)
-    const failing = prs.filter((p) => p.status === 'ci_failed').length
-    const changes = prs.filter((p) => p.status === 'changes_requested').length
+    const review = sectionCount(data, 'review')
+    const returned = sectionCount(data, 'returned')
+    const ready = sectionCount(data, 'ready')
     const mine = data.inProgress.find((e) => isUser(e.item))?.item
     const agents = data.inProgress.filter((e) => !isUser(e.item)).length
     const accent = rich ? SURFACE.accent : 'claude'
     segments.push({ text: ` · ${totalOpen(data)} open`, dim: true })
     if (mine) segments.push({ text: ` · working on ${mine.repo}#${mine.number}`, color: accent })
     if (agents > 0) segments.push({ text: ` · ${plural(agents, 'PR')} with agents`, color: accent })
-    if (failing > 0) segments.push({ text: ` · ${failing} CI failed`, color: 'error' })
-    if (changes > 0) segments.push({ text: ` · ${changes} changes requested`, color: 'warning' })
+    if (review > 0) segments.push({ text: ` · ${review} to review`, color: rich ? TONES.info.fg : TONES.info.key })
+    if (returned > 0) segments.push({ text: ` · ${returned} returned`, color: 'error' })
+    if (ready > 0) segments.push({ text: ` · ${ready} ready`, color: 'success' })
     segments.push({ text: ' · open ›', dim: true })
   }
 

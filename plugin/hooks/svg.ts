@@ -21,15 +21,6 @@ export function avatar(name: string, size = 30): { source: string; width: number
   }
 }
 
-export function repoMark(name: string, size = 22): { source: string; width: number; height: number } {
-  const color = earth(name)
-  return {
-    width: size,
-    height: size,
-    source: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" rx="${size * 0.28}" fill="${color}" fill-opacity="0.18"/><text x="50%" y="50%" dy=".35em" text-anchor="middle" font-family="${FONT}" font-size="${size * 0.5}" font-weight="700" fill="${color}">${escape(name.slice(0, 1).toUpperCase())}</text></svg>`,
-  }
-}
-
 export function pill(label: string, tone: Tone, dot = true): { source: string; width: number; height: number } {
   const { fg } = TONES[tone]
   const height = 20

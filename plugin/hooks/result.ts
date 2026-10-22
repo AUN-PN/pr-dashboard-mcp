@@ -11,7 +11,7 @@ export function textOf(result: McpToolResult): string {
 
 function isDashboard(value: unknown): value is Dashboard {
   const v = value as Partial<Dashboard> | null
-  return typeof v?.generatedAt === 'string' && Array.isArray(v.repos) && Array.isArray(v.inProgress) && Array.isArray(v.paused)
+  return typeof v?.generatedAt === 'string' && Array.isArray(v.sections) && Array.isArray(v.inProgress) && Array.isArray(v.paused)
 }
 
 function parseJson(text: string): unknown {

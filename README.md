@@ -1,6 +1,6 @@
 # pr-dashboard-mcp: GitHub pull request dashboard for Claude Code
 
-A **Claude Code plugin** and **MCP server** that show your open **GitHub pull requests** in a pane next to the conversation with Claude: review status, CI checks and who is working on what, grouped by repository. It also defines [**pr-work/1**](protocol/README.md), an open protocol that lets AI agents, skills and scripts mark a pull request as in progress.
+A **Claude Code plugin** and **MCP server** that show your open **GitHub pull requests** in a pane next to the conversation with Claude: review status, CI checks and who is working on what, grouped by what happens next: needs your review, returned to you, ready to merge, waiting for review, drafts. It also defines [**pr-work/1**](protocol/README.md), an open protocol that lets AI agents, skills and scripts mark a pull request as in progress.
 
 - **Claude Code** (terminal and the desktop app's Code tab): a one-line summary above the prompt box and a pane beside the chat.
 - **Any MCP client**: an MCP server Claude can ask to list, summarise and track pull requests.
@@ -23,7 +23,7 @@ No setup is needed if you are signed in to the GitHub CLI (`gh auth login`). The
 | Setting | Default |
 |---------|---------|
 | GitHub token | Your `gh` login |
-| Repositories | Every repository where a pull request involved you in the last 30 days |
+| Repositories | All of them; set a list to limit the pane and `list_pending_prs` to those |
 | Open on start | On |
 | Summary bar | On |
 
@@ -96,7 +96,7 @@ The server never writes to GitHub.
 | Environment variable | |
 |----------------------|-|
 | `GITHUB_PERSONAL_ACCESS_TOKEN` | Falls back to `gh auth token` |
-| `WATCHED_REPOS` | `owner/repo` list, comma or space separated; falls back to repositories with pull requests involving you in the last 30 days |
+| `WATCHED_REPOS` | `owner/repo` list, comma or space separated. Limits the pane to these repositories, and is what `list_pending_prs` lists; that tool falls back to repositories with pull requests involving you in the last 30 days |
 | `PR_WORK_DIR` | pr-work records; default `${XDG_STATE_HOME:-~/.local/state}/pr-work`. The old `~/.pr-dashboard-mcp/state.json` is moved in on first start |
 
 ## Agents and skills: pr-work/1

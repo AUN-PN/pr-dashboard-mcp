@@ -35,19 +35,20 @@ export type WorkItem = PrRef & {
 
 export type WorkEntry = { item: WorkItem; pullRequest: PullRequest | null }
 
-export type RepoGroup = {
-  owner: string
-  repo: string
+export type InboxSectionId = 'review' | 'returned' | 'ready' | 'waiting' | 'drafts'
+
+export type InboxSection = {
+  id: InboxSectionId
+  title: string
   pullRequests: PullRequest[]
-  totalCount: number
-  error: string | null
 }
 
 export type Dashboard = {
   generatedAt: string
+  viewer: string | null
   inProgress: WorkEntry[]
   paused: WorkItem[]
-  repos: RepoGroup[]
+  sections: InboxSection[]
 }
 
 export type DashboardState = {
