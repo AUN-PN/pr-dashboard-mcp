@@ -1,6 +1,6 @@
 {
   "name": "pr-dashboard",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Your open GitHub pull requests in a pane beside the chat, and an MCP server Claude can ask about them.",
   "author": {
     "name": "AUN-PN"
@@ -32,7 +32,7 @@
     "watched_repos": {
       "type": "string",
       "title": "Repositories",
-      "description": "owner/repo, separated by commas. Leave empty to show pull requests from every repository.",
+      "description": "owner/repo, separated by commas. Leave empty to use the repositories you worked in during the last 30 days.",
       "default": ""
     },
     "open_on_start": {
@@ -50,7 +50,7 @@
     "notifications": {
       "type": "boolean",
       "title": "Notifications",
-      "description": "Notify you when a pull request needs your review, is returned to you, or is ready to merge.",
+      "description": "Notify you when a pull request needs your review, is returned to you, is ready to merge, or is opened by your team.",
       "default": true
     },
     "ai_summaries": {

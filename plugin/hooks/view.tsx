@@ -35,6 +35,7 @@ const SECTION_TONE: Record<InboxSectionId, Tone> = {
   review: 'info',
   returned: 'danger',
   ready: 'success',
+  team: 'neutral',
   waiting: 'warning',
   drafts: 'draft',
 }
@@ -72,7 +73,6 @@ export function renderDashboard(
       {error !== null && renderNotice(ctx, error)}
       {data !== null && renderWarnings(ctx, data.warnings ?? [])}
       {data === null && error === null && isLoading && renderSkeleton(ctx)}
-      {data !== null && renderStats(ctx, data)}
       {data !== null && renderFocus(ctx, data)}
       {data !== null && renderSections(ctx, data)}
     </Box>
@@ -143,49 +143,6 @@ function renderWarnings({ el, rich }: Ctx, warnings: string[]) {
   )
 }
 
-function renderStats(ctx: Ctx, data: Dashboard) {
-  const { Box, Text } = ctx.el
-  const stats: Array<{ label: string; value: number; tone: Tone }> = [
-    { label: 'To review', value: sectionCount(data, 'review'), tone: SECTION_TONE.review },
-    { label: 'Returned', value: sectionCount(data, 'returned'), tone: SECTION_TONE.returned },
-    { label: 'Ready', value: sectionCount(data, 'ready'), tone: SECTION_TONE.ready },
-    { label: 'Waiting', value: sectionCount(data, 'waiting'), tone: SECTION_TONE.waiting },
-  ]
-
-  if (!ctx.rich) {
-    return (
-      <Text key="stats" dimColor>
-        {stats.map((s) => `${s.value} ${s.label.toLowerCase()}`).join(' · ')}
-      </Text>
-    )
-  }
-
-  return (
-    <Box key="stats" flexDirection="row" gap="sm" flexWrap="wrap">
-      {stats.map((s) => (
-        <Box
-          key={`stat-${s.label}`}
-          flexDirection="column"
-          flexGrow={1}
-          minWidth={10}
-          paddingX={1}
-          paddingY={1}
-          borderStyle="round"
-          borderColor={SURFACE.border}
-          backgroundColor={s.value > 0 ? TONES[s.tone].tint : SURFACE.card}
-        >
-          <Text size="title" weight="bold" color={s.value > 0 ? TONES[s.tone].fg : undefined} dimColor={s.value === 0} tabular>
-            {String(s.value)}
-          </Text>
-          <Text size="caption" dimColor>
-            {s.label}
-          </Text>
-        </Box>
-      ))}
-    </Box>
-  )
-}
-
 const isUser = (item: WorkItem) => item.actor === USER_ACTOR
 
 type ClaudeAction = { name: 'fix' | 'review'; label: string; run: () => void }
@@ -199,6 +156,7 @@ const who = (item: WorkItem) => (isUser(item) ? 'you' : (item.label ?? item.acto
 
 function renderFocus(ctx: Ctx, data: Dashboard) {
   const { Box, Text, Button } = ctx.el
+  if (data.inProgress.length === 0 && data.paused.length === 0) return null
   const heading = (
     <Text size="caption" weight="semibold" color={ctx.rich ? SURFACE.accent : 'claude'}>
       IN PROGRESS
@@ -208,13 +166,7 @@ function renderFocus(ctx: Ctx, data: Dashboard) {
   return (
     <Box key="focus" flexDirection="column" gap="xs">
       {heading}
-      {data.inProgress.length === 0 ? (
-        <Box borderStyle={ctx.rich ? 'dashed' : 'round'} borderColor={SURFACE.border} paddingX={1} paddingY={ctx.rich ? 1 : 0}>
-          <Text dimColor>☕ Nothing in progress. Hover a pull request and press Start.</Text>
-        </Box>
-      ) : (
-        data.inProgress.map((entry) => renderWork(ctx, entry))
-      )}
+      {data.inProgress.map((entry) => renderWork(ctx, entry))}
       {data.paused.length > 0 && (
         <Box flexDirection="row" gap="xs" flexWrap="wrap" alignItems="center">
           <Text dimColor size="footnote">
@@ -301,7 +253,7 @@ function renderSections(ctx: Ctx, data: Dashboard) {
   if (filled.length === 0) {
     return (
       <Text key="empty" dimColor>
-        🎉 All clear. Nothing waiting for your review and no open pull requests of yours.
+        🎉 All clear. No open pull requests from you, for your review, or from your team.
       </Text>
     )
   }
@@ -456,6 +408,7 @@ export function renderSummaryBar(el: ViewElements, surface: RenderSurface, state
     const review = sectionCount(data, 'review')
     const returned = sectionCount(data, 'returned')
     const ready = sectionCount(data, 'ready')
+    const team = sectionCount(data, 'team')
     const mine = data.inProgress.find((e) => isUser(e.item))?.item
     const agents = data.inProgress.filter((e) => !isUser(e.item)).length
     const accent = rich ? SURFACE.accent : 'claude'
@@ -465,6 +418,7 @@ export function renderSummaryBar(el: ViewElements, surface: RenderSurface, state
     if (review > 0) segments.push({ text: ` · ${review} to review`, color: rich ? TONES.info.fg : TONES.info.key })
     if (returned > 0) segments.push({ text: ` · ${returned} returned`, color: 'error' })
     if (ready > 0) segments.push({ text: ` · ${ready} ready`, color: 'success' })
+    if (team > 0) segments.push({ text: ` · ${team} from team` })
     segments.push({ text: ' · open ›', dim: true })
   }
 

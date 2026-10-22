@@ -2,7 +2,7 @@ import type { EngineInterface } from 'claude-code'
 import type { Dashboard, InboxSectionId, PullRequest } from '../types'
 import { prRef } from './format'
 
-const STORE_KEY = 'seen'
+const STORE_KEY = 'places'
 const MAX_SEPARATE = 3
 
 type Seen = Record<string, string>
@@ -13,6 +13,7 @@ const EVENTS: Partial<Record<InboxSectionId, (pr: PullRequest) => string>> = {
   review: () => 'Review requested',
   returned: (pr) => (pr.status === 'changes_requested' ? 'Changes requested' : 'Checks failed'),
   ready: () => 'Ready to merge',
+  team: () => 'New pull request',
 }
 
 const placeOf = (section: InboxSectionId, pr: PullRequest) => (section === 'returned' ? `${section}:${pr.status}` : section)

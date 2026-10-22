@@ -164,6 +164,11 @@ async function openPane($: EngineInterface, features: Features): Promise<boolean
   return isPlaced
 }
 
+async function startUp($: EngineInterface, features: Features, openOnStart: boolean): Promise<void> {
+  const isPlaced = openOnStart && (await openPane($, features))
+  if (!isPlaced) await createActions($, features).refreshIfStale()
+}
+
 export const register: Register = (on, options) => {
   const features: Features = {
     summaries: options.ai_summaries !== false,
@@ -182,8 +187,7 @@ export const register: Register = (on, options) => {
     await restoreCached($)
     $.clock.every(REFRESH_EVERY_MS, () => inBackground(createActions($, features).refresh()))
     $.clock.every(SYNC_WORK_EVERY_MS, () => inBackground(createActions($, features).syncWork()))
-    if (options.open_on_start !== false) inBackground(openPane($, features))
-    else inBackground(createActions($, features).refreshIfStale())
+    inBackground(startUp($, features, options.open_on_start !== false))
     return started
   })
 

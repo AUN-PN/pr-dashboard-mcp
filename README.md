@@ -1,6 +1,6 @@
 # pr-dashboard-mcp: GitHub pull request dashboard for Claude Code
 
-A **Claude Code plugin** and **MCP server** that show your open **GitHub pull requests** in a pane next to the conversation with Claude: review status, CI checks and who is working on what, grouped by what happens next: needs your review, returned to you, ready to merge, waiting for review, drafts. It also defines [**pr-work/1**](protocol/README.md), an open protocol that lets AI agents, skills and scripts mark a pull request as in progress.
+A **Claude Code plugin** and **MCP server** that show your open **GitHub pull requests** in a pane next to the conversation with Claude: review status, CI checks and who is working on what, grouped by what happens next: needs your review, returned to you, ready to merge, from your team, waiting for review, drafts. It also defines [**pr-work/1**](protocol/README.md), an open protocol that lets AI agents, skills and scripts mark a pull request as in progress.
 
 - **Claude Code** (terminal and the desktop app's Code tab): a one-line summary above the prompt box and a pane beside the chat, with a button that hands each pull request to Claude to review or fix, and a notification when one needs you.
 - **Any MCP client**: an MCP server Claude can ask to list, summarise and track pull requests.
@@ -8,6 +8,7 @@ A **Claude Code plugin** and **MCP server** that show your open **GitHub pull re
 
 ## Requirements
 
+- **Claude Code 2.1.299 or later** for the pane: earlier versions refuse to load it.
 - **Node.js 20 or later** on your `PATH`: the MCP server runs on it.
 - A GitHub account on github.com or GitHub Enterprise Server, signed in with the [GitHub CLI](https://cli.github.com) or given as a token.
 
@@ -28,7 +29,9 @@ Each pull request in the pane has one Claude button:
 - **✦ Review** runs `/code-review` on it. The review only reads, and its findings arrive in the conversation.
 - **✦ Fix** replaces it on your own pull requests whose checks fail or that a reviewer sent back. Claude works on the branch in a separate worktree, fixes it, runs the tests and shows you the change before it pushes.
 
-You are notified when a pull request needs your review, is returned to you, or becomes ready to merge. Four or more at once arrive as one notification.
+You are notified when a pull request needs your review, is returned to you, becomes ready to merge, or is opened by your team. Four or more at once arrive as one notification.
+
+Everything reads one list of open pull requests, fetched once per reload: yours, those that request your review, and every open one in your repositories. Your repositories are the ones in the Repositories setting, or, when it is empty, the ones you worked in during the last 30 days. Each pull request lands in one section: **From your team** holds those by other people that request no review from you, without drafts and bots. The sections, the summary bar, the notifications and `list_pending_prs` all count from that list, so they agree.
 
 The pane reloads by itself: every 5 minutes; when you open it or send a prompt and what it shows is over a minute old; and 5 and 30 seconds after Claude runs `git push` or a `gh pr` command that changes a pull request (`create`, `merge`, `close`, `reopen`, `ready`, `edit`, `review`, `comment`). A reload asked for while one runs waits for it, then runs once. **Refresh** reloads at once.
 
@@ -38,7 +41,7 @@ No setup is needed if you are signed in to the GitHub CLI (`gh auth login`) or h
 |---------|---------|
 | GitHub token | `GH_TOKEN`, then your `gh` login |
 | GitHub host | github.com; set your GitHub Enterprise Server host, such as `github.example.com` |
-| Repositories | All of them; set a list to limit the pane and `list_pending_prs` to those |
+| Repositories | The ones you worked in during the last 30 days; set a list to use those instead |
 | Open on start | On |
 | Summary bar | On |
 | Notifications | On |
@@ -110,7 +113,7 @@ An organisation with SAML single sign-on hides its pull requests until the token
 
 | Tool | |
 |------|-|
-| `list_pending_prs` | Pull requests across repositories, with review and CI status |
+| `list_pending_prs` | The pane's open pull requests by repository; or any repositories and state you name |
 | `get_pr_details` | One pull request in full: description, diffs, checks, reviews, comments |
 | `set_pr_status` | Mark a pull request `working`, `paused`, `done` or `clear` for the user or for an agent (`actor`, `note`, `ttl_minutes`) |
 | `get_pr_status` | Who is working on which pull request, from local state only |
@@ -120,7 +123,7 @@ An organisation with SAML single sign-on hides its pull requests until the token
 |----------------------|-|
 | `GITHUB_PERSONAL_ACCESS_TOKEN` | Falls back to `GH_TOKEN`, `GITHUB_TOKEN`, then `gh auth token` |
 | `GITHUB_HOST` | GitHub Enterprise Server host. Falls back to `GH_HOST`, then `github.com` |
-| `WATCHED_REPOS` | `owner/repo` list, comma or space separated. Limits the pane to these repositories, and is what `list_pending_prs` lists; that tool falls back to repositories with pull requests involving you in the last 30 days |
+| `WATCHED_REPOS` | `owner/repo` list, comma or space separated. Your repositories for the pane and `list_pending_prs`; when empty, the repositories with pull requests involving you in the last 30 days |
 | `PR_WORK_DIR` | pr-work records; default `${XDG_STATE_HOME:-~/.local/state}/pr-work` |
 
 ## Agents and skills: pr-work/1
