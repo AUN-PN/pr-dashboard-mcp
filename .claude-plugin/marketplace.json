@@ -1,0 +1,14 @@
+{
+  "name": "pr-dashboard",
+  "description": "Claude Code plugins for tracking GitHub pull requests.",
+  "owner": {
+    "name": "AUN-PN"
+  },
+  "plugins": [
+    {
+      "name": "pr-dashboard",
+      "source": "./plugin",
+      "description": "Your open GitHub pull requests in a pane beside the chat, and an MCP server Claude can ask about them."
+    }
+  ]
+}

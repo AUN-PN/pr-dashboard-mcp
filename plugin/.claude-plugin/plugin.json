@@ -1,0 +1,48 @@
+{
+  "name": "pr-dashboard",
+  "version": "0.1.0",
+  "description": "Your open GitHub pull requests in a pane beside the chat, and an MCP server Claude can ask about them.",
+  "author": {
+    "name": "AUN-PN"
+  },
+  "keywords": [
+    "github",
+    "pull-requests",
+    "dashboard",
+    "mcp",
+    "code-review",
+    "ai-agents",
+    "pr-work"
+  ],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "github_token": {
+      "type": "string",
+      "title": "GitHub token",
+      "description": "Personal access token with read access to your pull requests. Leave empty to use your gh CLI login.",
+      "sensitive": true,
+      "default": ""
+    },
+    "watched_repos": {
+      "type": "string",
+      "title": "Repositories",
+      "description": "owner/repo, separated by commas. Leave empty to show every repository where you opened, reviewed or were asked to review a pull request in the last 30 days.",
+      "default": ""
+    },
+    "open_on_start": {
+      "type": "boolean",
+      "title": "Open on start",
+      "description": "Open the pane when a session starts.",
+      "default": true
+    },
+    "summary_bar": {
+      "type": "boolean",
+      "title": "Summary bar",
+      "description": "Show a one-line pull request summary above the prompt box.",
+      "default": true
+    }
+  },
+  "homepage": "https://github.com/AUN-PN/pr-dashboard-mcp",
+  "repository": "https://github.com/AUN-PN/pr-dashboard-mcp",
+  "license": "MIT"
+}

@@ -1,0 +1,13 @@
+/*
+!/.gitignore
+!/.claude-plugin/
+!/plugin/
+!/protocol/
+!/README.md
+!/LICENSE
+
+/plugin/test/
+/plugin/tsconfig.json
+/plugin/.claude-plugin/types/
+
+.DS_Store
