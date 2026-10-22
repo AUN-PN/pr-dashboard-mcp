@@ -13,7 +13,13 @@ const PANE = 'pr-dashboard'
 const TITLE = 'Pull requests'
 const REFRESH_EVERY_MS = 5 * 60_000
 const SYNC_WORK_EVERY_MS = 15_000
+const STALE_AFTER_MS = 60_000
+const LOAD_TIMEOUT_MS = 60_000
+const REFRESH_AFTER_CHANGE_MS = [5_000, 30_000]
 const CACHE_KEY = 'dashboard'
+
+const CHANGES_PULL_REQUESTS =
+  /\bgit\s+(?:-C\s+\S+\s+)?push\b|\bgh\s+pr\s+(?:create|merge|close|reopen|ready|edit|review|comment)\b/
 
 const NOT_STARTED =
   'The pr-dashboard server did not start. It needs Node.js 20 or later on your PATH; /mcp shows the error.'
@@ -22,6 +28,8 @@ const dashboard = atom({ plugin: 'pr-dashboard', key: 'dashboard' } as const, IN
 const summaries = atom({ plugin: 'pr-dashboard', key: 'summaries' } as const, {} as Summaries)
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err))
+
+const inBackground = (work: Promise<unknown>) => void work.catch(() => undefined)
 
 async function serverName($: EngineInterface): Promise<string> {
   const own = await $.mcp.connect(SERVER)
@@ -72,18 +80,32 @@ function createActions($: EngineInterface, withSummaries: boolean): Actions {
   }
 
   async function loaded(data: Dashboard) {
-    await patch((s) => ({ ...s, data, error: null, isLoading: false }))
+    await patch((s) => ({ ...s, data, error: null, isLoading: false, loadingSince: null }))
     await $.store.set(CACHE_KEY, data).catch(() => undefined)
-    if (withSummaries) void summariseDashboard($, data, (pr) => fetchDetails($, pr)).catch(() => undefined)
+    if (withSummaries) inBackground(summariseDashboard($, data, (pr) => fetchDetails($, pr)))
   }
 
   async function refresh() {
-    await patch((s) => ({ ...s, isLoading: true }))
+    const now = Date.now()
+    let isClaimed = false
+    await patch((s) => {
+      isClaimed = !s.isLoading || now - (s.loadingSince ?? 0) > LOAD_TIMEOUT_MS
+      return isClaimed ? { ...s, isLoading: true, loadingSince: now, isQueued: false } : { ...s, isQueued: true }
+    })
+    if (!isClaimed) return
     try {
       await loaded(await fetchDashboard($))
     } catch (err) {
-      await patch((s) => ({ ...s, error: message(err), isLoading: false }))
+      await patch((s) => ({ ...s, error: message(err), isLoading: false, loadingSince: null }))
     }
+    if ((await read($, dashboard)).isQueued) await refresh()
+  }
+
+  async function refreshIfStale() {
+    const { data, isLoading, loadingSince } = await read($, dashboard)
+    if (isLoading && Date.now() - (loadingSince ?? 0) <= LOAD_TIMEOUT_MS) return
+    if (data && Date.now() - Date.parse(data.generatedAt) < STALE_AFTER_MS) return
+    await refresh()
   }
 
   async function syncWork() {
@@ -91,10 +113,10 @@ function createActions($: EngineInterface, withSummaries: boolean): Actions {
     if (!current.data || current.isLoading || current.pending.length > 0) return
     try {
       if (workFingerprint(await fetchWork($)) === workFingerprint(shownWork(current.data))) return
-      await loaded(await fetchDashboard($))
     } catch {
       return
     }
+    await refresh()
   }
 
   async function setWork(pr: PrRef, status: WorkStatus) {
@@ -115,7 +137,7 @@ function createActions($: EngineInterface, withSummaries: boolean): Actions {
     await $.prompt.submit({ text: `Summarise PR ${prRef(pr)}${title} for me.`, asUser: true })
   }
 
-  return { refresh, syncWork, setWork, summarise }
+  return { refresh, refreshIfStale, syncWork, setWork, summarise }
 }
 
 async function restoreCached($: EngineInterface): Promise<void> {
@@ -126,13 +148,8 @@ async function restoreCached($: EngineInterface): Promise<void> {
 
 async function openPane($: EngineInterface, withSummaries: boolean): Promise<boolean> {
   const { isPlaced } = await $.ui.open({ id: PANE, title: TITLE })
-  if (isPlaced) await createActions($, withSummaries).refresh()
+  if (isPlaced) await createActions($, withSummaries).refreshIfStale()
   return isPlaced
-}
-
-async function loadIfEmpty($: EngineInterface, withSummaries: boolean): Promise<void> {
-  const { value } = await $.state.get({ plugin: 'pr-dashboard', key: 'dashboard' })
-  if (!value?.data && !value?.isLoading) await createActions($, withSummaries).refresh()
 }
 
 export const register: Register = (on, options) => {
@@ -148,17 +165,27 @@ export const register: Register = (on, options) => {
     })
     const started = await next(e)
     await restoreCached($)
-    $.clock.every(REFRESH_EVERY_MS, () => void createActions($, withSummaries).refresh())
-    $.clock.every(SYNC_WORK_EVERY_MS, () => void createActions($, withSummaries).syncWork())
-    if (options.open_on_start !== false) void openPane($, withSummaries)
-    else void createActions($, withSummaries).refresh()
+    $.clock.every(REFRESH_EVERY_MS, () => inBackground(createActions($, withSummaries).refresh()))
+    $.clock.every(SYNC_WORK_EVERY_MS, () => inBackground(createActions($, withSummaries).syncWork()))
+    if (options.open_on_start !== false) inBackground(openPane($, withSummaries))
+    else inBackground(createActions($, withSummaries).refreshIfStale())
     return started
   })
 
   on('prompt.submit', async ($, e, next) => {
-    void loadIfEmpty($, withSummaries)
+    inBackground(createActions($, withSummaries).refreshIfStale())
     return next(e)
   }).catch(($, e, next) => next(e))
+
+  on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
+    const ran = await next(e)
+    if (ran.deny === undefined && ran.isError !== true && CHANGES_PULL_REQUESTS.test(e.command)) {
+      for (const ms of REFRESH_AFTER_CHANGE_MS) {
+        $.clock.after(ms, () => inBackground(createActions($, withSummaries).refresh()))
+      }
+    }
+    return ran
+  })
 
   on('command.run', { command: 'pr-dashboard' }, async ($) => {
     const isPlaced = await openPane($, withSummaries)
@@ -176,6 +203,6 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (options.summary_bar === false || e.props.hasSurvey) return next(e)
-    return renderSummaryBar($.ui.resolve(e), e.surface, await read($, dashboard), () => void openPane($, withSummaries))
+    return renderSummaryBar($.ui.resolve(e), e.surface, await read($, dashboard), () => inBackground(openPane($, withSummaries)))
   })
 }

@@ -1,6 +1,6 @@
 {
   "name": "pr-dashboard",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Your open GitHub pull requests in a pane beside the chat, and an MCP server Claude can ask about them.",
   "author": {
     "name": "AUN-PN"

@@ -23,6 +23,8 @@ In the desktop app's Code tab: click **+** next to the prompt box → **Plugins*
 
 The summary bar above the prompt box shows how many pull requests are open, which one you are working on and which need attention; click it to open the pane. The pane opens when a session starts. Run `/pr-dashboard`, or ask Claude for your dashboard, to open it again.
 
+The pane reloads by itself: every 5 minutes; when you open it or send a prompt and what it shows is over a minute old; and 5 and 30 seconds after Claude runs `git push` or a `gh pr` command that changes a pull request (`create`, `merge`, `close`, `reopen`, `ready`, `edit`, `review`, `comment`). A reload asked for while one runs waits for it, then runs once. **Refresh** reloads at once.
+
 No setup is needed if you are signed in to the GitHub CLI (`gh auth login`) or have `GH_TOKEN` set. The plugin settings are all optional:
 
 | Setting | Default |

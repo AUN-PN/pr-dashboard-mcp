@@ -56,6 +56,8 @@ export type DashboardState = {
   data: Dashboard | null
   error: string | null
   isLoading: boolean
+  loadingSince: number | null
+  isQueued: boolean
   pending: string[]
 }
 
