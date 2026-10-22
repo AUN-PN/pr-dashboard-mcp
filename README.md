@@ -6,6 +6,11 @@ A **Claude Code plugin** and **MCP server** that show your open **GitHub pull re
 - **Any MCP client**: an MCP server Claude can ask to list, summarise and track pull requests.
 - **Anyone**: [pr-work/1](protocol/README.md), an open file protocol any skill, script or AI agent uses to mark a pull request as in progress. The dashboard shows each one with who holds it and what it is doing.
 
+## Requirements
+
+- **Node.js 20 or later** on your `PATH`: the MCP server runs on it.
+- A GitHub account on github.com or GitHub Enterprise Server, signed in with the [GitHub CLI](https://cli.github.com) or given as a token.
+
 ## Install in Claude Code
 
 ```
@@ -18,15 +23,16 @@ In the desktop app's Code tab: click **+** next to the prompt box → **Plugins*
 
 The summary bar above the prompt box shows how many pull requests are open, which one you are working on and which need attention; click it to open the pane. The pane opens when a session starts. Run `/pr-dashboard`, or ask Claude for your dashboard, to open it again.
 
-No setup is needed if you are signed in to the GitHub CLI (`gh auth login`). The plugin settings take an optional token and an optional list of repositories:
+No setup is needed if you are signed in to the GitHub CLI (`gh auth login`) or have `GH_TOKEN` set. The plugin settings are all optional:
 
 | Setting | Default |
 |---------|---------|
-| GitHub token | Your `gh` login |
+| GitHub token | `GH_TOKEN`, then your `gh` login |
+| GitHub host | github.com; set your GitHub Enterprise Server host, such as `github.example.com` |
 | Repositories | All of them; set a list to limit the pane and `list_pending_prs` to those |
 | Open on start | On |
 | Summary bar | On |
-| AI summaries | On: one line under each pull request from the smallest Claude model (the `haiku` alias, so it follows new Haiku releases), kept until the pull request changes |
+| AI summaries | On: one line under each of the first 20 pull requests from the smallest Claude model (the `haiku` alias, so it follows new Haiku releases), kept until the pull request changes |
 
 ### Auto mode
 
@@ -77,12 +83,18 @@ Use an absolute path to `node` (`which node`): Claude Desktop does not read your
 
 ## Token
 
-Leave the token empty to use `gh auth token`. Otherwise either works:
+The server takes the first token it finds, and never writes to GitHub:
 
-- Fine-grained token, read-only: **Pull requests**, **Contents**, **Commit statuses**.
-- Classic token with the `repo` scope.
+1. The plugin's GitHub token setting, or `GITHUB_PERSONAL_ACCESS_TOKEN`.
+2. `GH_TOKEN`, then `GITHUB_TOKEN`. On an Enterprise host, `GH_ENTERPRISE_TOKEN`, then `GITHUB_ENTERPRISE_TOKEN`.
+3. `gh auth token --hostname <host>`.
 
-The server never writes to GitHub.
+A token you create can be either:
+
+- Fine-grained, read-only: **Pull requests**, **Contents**, **Commit statuses**.
+- Classic, with the `repo` scope.
+
+An organisation with SAML single sign-on hides its pull requests until the token is authorised for it on GitHub. Until then the pane shows the rest, with GitHub's reason above them.
 
 ## Tools
 
@@ -96,9 +108,10 @@ The server never writes to GitHub.
 
 | Environment variable | |
 |----------------------|-|
-| `GITHUB_PERSONAL_ACCESS_TOKEN` | Falls back to `gh auth token` |
+| `GITHUB_PERSONAL_ACCESS_TOKEN` | Falls back to `GH_TOKEN`, `GITHUB_TOKEN`, then `gh auth token` |
+| `GITHUB_HOST` | GitHub Enterprise Server host. Falls back to `GH_HOST`, then `github.com` |
 | `WATCHED_REPOS` | `owner/repo` list, comma or space separated. Limits the pane to these repositories, and is what `list_pending_prs` lists; that tool falls back to repositories with pull requests involving you in the last 30 days |
-| `PR_WORK_DIR` | pr-work records; default `${XDG_STATE_HOME:-~/.local/state}/pr-work`. The old `~/.pr-dashboard-mcp/state.json` is moved in on first start |
+| `PR_WORK_DIR` | pr-work records; default `${XDG_STATE_HOME:-~/.local/state}/pr-work` |
 
 ## Agents and skills: pr-work/1
 
@@ -109,7 +122,7 @@ protocol/pr-work.sh set acme/web#45 working --actor my-review-skill --note "runn
 protocol/pr-work.sh set acme/web#45 done --actor my-review-skill --note "passed"
 ```
 
-The script is POSIX `sh` with no dependencies; copy it into the skill. An MCP client calls `set_pr_status` with its own `actor` instead. Any other language writes one JSON file. [protocol/README.md](protocol/README.md) is the specification and [protocol/pr-work-1.schema.json](protocol/pr-work-1.schema.json) its JSON Schema.
+The script is POSIX `sh` with no dependencies; copy it into the skill. A `done` record without `--ttl` lasts a day. An MCP client calls `set_pr_status` with its own `actor` instead. Any other language writes one JSON file. [protocol/README.md](protocol/README.md) is the specification and [protocol/pr-work-1.schema.json](protocol/pr-work-1.schema.json) its JSON Schema.
 
 ## Repository
 

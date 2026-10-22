@@ -15,6 +15,9 @@ const REFRESH_EVERY_MS = 5 * 60_000
 const SYNC_WORK_EVERY_MS = 15_000
 const CACHE_KEY = 'dashboard'
 
+const NOT_STARTED =
+  'The pr-dashboard server did not start. It needs Node.js 20 or later on your PATH; /mcp shows the error.'
+
 const dashboard = atom({ plugin: 'pr-dashboard', key: 'dashboard' } as const, INITIAL)
 const summaries = atom({ plugin: 'pr-dashboard', key: 'summaries' } as const, {} as Summaries)
 
@@ -22,7 +25,10 @@ const message = (err: unknown) => (err instanceof Error ? err.message : String(e
 
 async function serverName($: EngineInterface): Promise<string> {
   const own = await $.mcp.connect(SERVER)
-  return own.isConnected ? own.server : SERVER
+  if (own.isConnected) return own.server
+  if (own.reason === 'failed') throw new Error(NOT_STARTED)
+  if (own.reason !== 'unlisted') throw new Error(own.message)
+  return SERVER
 }
 
 async function fetchDashboard($: EngineInterface): Promise<Dashboard> {
@@ -60,7 +66,10 @@ async function setWorkStatus($: EngineInterface, pr: PrRef, status: WorkStatus):
 }
 
 function createActions($: EngineInterface, withSummaries: boolean): Actions {
-  const patch = (fn: (s: DashboardState) => DashboardState) => update($, dashboard, fn)
+  const patch = async (fn: (s: DashboardState) => DashboardState) => {
+    await update($, dashboard, fn)
+    $.ui.invalidate('ui.render')
+  }
 
   async function loaded(data: Dashboard) {
     await patch((s) => ({ ...s, data, error: null, isLoading: false }))

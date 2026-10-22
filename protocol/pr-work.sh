@@ -10,7 +10,8 @@ usage: pr-work.sh set <owner/repo#number> <working|paused|done> [--actor id] [--
        pr-work.sh clear <owner/repo#number> [--actor id]
        pr-work.sh list [--json]
 
---actor defaults to $PR_WORK_ACTOR, then "user". Records live in $PR_WORK_DIR
+--actor defaults to $PR_WORK_ACTOR, then "user". A done record without --ttl
+lasts a day. Records live in $PR_WORK_DIR
 (default ${XDG_STATE_HOME:-~/.local/state}/pr-work).
 EOF
   exit 2
@@ -122,6 +123,7 @@ cmd_set() {
   shift 2
   case $STATUS in working | paused | done) ;; *) die "status must be working, paused or done" ;; esac
   parse_options "$@"
+  [ "$STATUS" = done ] && [ -z "$EXPIRES" ] && EXPIRES=$(iso_in_minutes 1440)
   [ "$ACTOR" = user ] && [ "$STATUS" = working ] && pause_other_user_work
   write_record
 }
@@ -143,14 +145,16 @@ records() {
 
 cmd_list() {
   if [ "${1:-}" = --json ]; then
-    printf '['
-    sep=
-    for file in $(records); do
-      printf '%s' "$sep"
-      tr -d '\n' <"$file"
-      sep=,
-    done
-    printf ']\n'
+    records | {
+      printf '['
+      sep=
+      while IFS= read -r file; do
+        printf '%s' "$sep"
+        tr -d '\n' <"$file"
+        sep=,
+      done
+      printf ']\n'
+    }
     return
   fi
   records | while IFS= read -r file; do

@@ -5,6 +5,7 @@
       "args": ["${CLAUDE_PLUGIN_ROOT}/server/index.js"],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${user_config.github_token}",
+        "GITHUB_HOST": "${user_config.github_host}",
         "WATCHED_REPOS": "${user_config.watched_repos}"
       }
     }

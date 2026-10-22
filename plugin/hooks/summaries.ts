@@ -7,6 +7,7 @@ export const SUMMARY_MODEL = 'haiku'
 
 const STORE_KEY = 'summaries'
 const MAX_INPUT_CHARS = 12_000
+const MAX_SUMMARIES = 20
 const PARALLEL = 2
 
 const SYSTEM =
@@ -58,6 +59,7 @@ async function summariseOne($: EngineInterface, pr: PullRequest, details: (pr: P
     ? { status: 'ready', updatedAt: pr.updatedAt, text }
     : { status: 'failed', updatedAt: pr.updatedAt }
   await update($, summaries, (all) => ({ ...all, [ref]: summary }))
+  $.ui.invalidate('ui.render')
 }
 
 export async function summariseDashboard(
@@ -65,7 +67,7 @@ export async function summariseDashboard(
   data: Dashboard,
   details: (pr: PullRequest) => Promise<string>,
 ): Promise<void> {
-  const prs = visiblePullRequests(data)
+  const prs = visiblePullRequests(data).slice(0, MAX_SUMMARIES)
   let current = await read($, summaries)
   if (Object.keys(current).length === 0) current = await restoreSummaries($)
 

@@ -55,7 +55,8 @@ export function renderDashboard(
         <Button key="refresh" label="⟳ Refresh" dimColor={isLoading} onPress={() => void actions.refresh()} />
       </Box>
       {error !== null && renderNotice(ctx, error)}
-      {data === null && error === null && renderSkeleton(ctx)}
+      {data !== null && renderWarnings(ctx, data.warnings ?? [])}
+      {data === null && error === null && isLoading && renderSkeleton(ctx)}
       {data !== null && renderStats(ctx, data)}
       {data !== null && renderFocus(ctx, data)}
       {data !== null && renderSections(ctx, data)}
@@ -78,7 +79,7 @@ function renderSkeleton({ el, rich }: Ctx) {
           paddingX={1}
           paddingY={1}
         >
-          <Svg source={bar.source} alt="Loading" width={bar.width} height={bar.height} isInteractive />
+          <Svg source={bar.source} alt="Loading" width={bar.width} height={bar.height} />
         </Box>
       ))}
     </Box>
@@ -97,6 +98,32 @@ function renderNotice({ el, rich }: Ctx, message: string) {
       paddingY={rich ? 1 : 0}
     >
       <Text color="error">{message}</Text>
+    </Box>
+  )
+}
+
+function renderWarnings({ el, rich }: Ctx, warnings: string[]) {
+  const { Box, Text } = el
+  if (warnings.length === 0) return null
+  return (
+    <Box
+      key="warnings"
+      flexDirection="column"
+      gap="xs"
+      borderStyle="round"
+      borderColor={rich ? SURFACE.border : 'warning'}
+      backgroundColor={rich ? TONES.warning.tint : undefined}
+      paddingX={1}
+      paddingY={rich ? 1 : 0}
+    >
+      <Text color="warning" weight="semibold">
+        Some pull requests may be missing
+      </Text>
+      {warnings.map((w, i) => (
+        <Text key={`warning-${i}`} dimColor size="footnote">
+          {w}
+        </Text>
+      ))}
     </Box>
   )
 }

@@ -18,12 +18,12 @@ $PR_WORK_DIR                         default: ${XDG_STATE_HOME:-~/.local/state}/
 ```json
 {
   "protocol": "pr-work/1",
-  "repo": "onecorp-tech/hubzell",
-  "number": 113,
+  "repo": "acme/web",
+  "number": 45,
   "status": "working",
-  "actor": "hubzell-pr-review",
-  "label": "HubZell PR review",
-  "note": "runtime test on slot a",
+  "actor": "review-skill",
+  "label": "Review skill",
+  "note": "running the test suite",
   "updatedAt": "2026-10-22T08:00:00Z",
   "expiresAt": "2026-10-22T09:00:00Z"
 }
@@ -32,7 +32,7 @@ $PR_WORK_DIR                         default: ${XDG_STATE_HOME:-~/.local/state}/
 | Field | Required | |
 |-------|----------|-|
 | `protocol` | yes | Always `pr-work/1` |
-| `repo` | yes | `owner/repo` on github.com |
+| `repo` | yes | `owner/repo` on the GitHub host the readers use |
 | `number` | yes | Pull request number |
 | `status` | yes | `working`, `paused` or `done` |
 | `actor` | yes | Who holds the record; matches the file name. `[a-z0-9][a-z0-9._-]{0,63}` |
@@ -47,7 +47,7 @@ $PR_WORK_DIR                         default: ${XDG_STATE_HOME:-~/.local/state}/
 
 1. **Write atomically.** Write a temporary file in the same directory, then rename it over `<actor>.json`.
 2. **Own your file.** Write and delete only files named after your own `actor`.
-3. **Clear by deleting.** Remove your file when you no longer hold the pull request.
+3. **Clear by deleting.** Remove your file when you no longer hold the pull request. A `done` record says you finished: give it a lease as well, so it does not stay forever (the reference clients keep it for a day).
 4. **Lease when you can crash.** Agents set `expiresAt` and write the record again before it passes. Readers ignore expired records and may delete them.
 5. **`user` is the human.** The actor `user` is the person at this machine and holds at most one `working` record: a writer that sets one `user` record to `working` sets the others to `paused`. Every other actor may work on many pull requests at once.
 6. **Ignore what you do not know.** Readers skip unknown fields, unknown statuses and files that do not parse. New fields never change the meaning of existing ones; a breaking change becomes `pr-work/2`.
@@ -57,10 +57,10 @@ $PR_WORK_DIR                         default: ${XDG_STATE_HOME:-~/.local/state}/
 From a shell, with [`pr-work.sh`](pr-work.sh) (POSIX `sh`, no dependencies; copy it into your project):
 
 ```bash
-pr-work.sh set onecorp-tech/hubzell#113 working --actor hubzell-pr-review --label "HubZell PR review" --note "checks" --ttl 60
-pr-work.sh set onecorp-tech/hubzell#113 paused  --actor hubzell-pr-review --note "waiting for go"
-pr-work.sh set onecorp-tech/hubzell#113 done    --actor hubzell-pr-review --note "passed"
-pr-work.sh clear onecorp-tech/hubzell#113 --actor hubzell-pr-review
+pr-work.sh set acme/web#45 working --actor review-skill --label "Review skill" --note "checks" --ttl 60
+pr-work.sh set acme/web#45 paused  --actor review-skill --note "waiting for go"
+pr-work.sh set acme/web#45 done    --actor review-skill --note "passed"
+pr-work.sh clear acme/web#45 --actor review-skill
 pr-work.sh list
 ```
 

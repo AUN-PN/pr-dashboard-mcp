@@ -1,6 +1,6 @@
 {
   "name": "pr-dashboard",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Your open GitHub pull requests in a pane beside the chat, and an MCP server Claude can ask about them.",
   "author": {
     "name": "AUN-PN"
@@ -19,8 +19,14 @@
     "github_token": {
       "type": "string",
       "title": "GitHub token",
-      "description": "Personal access token with read access to your pull requests. Leave empty to use your gh CLI login.",
+      "description": "Personal access token with read access to your pull requests. Leave empty to use GH_TOKEN or your gh CLI login.",
       "sensitive": true,
+      "default": ""
+    },
+    "github_host": {
+      "type": "string",
+      "title": "GitHub host",
+      "description": "Your GitHub Enterprise Server host, such as github.example.com. Leave empty for github.com.",
       "default": ""
     },
     "watched_repos": {

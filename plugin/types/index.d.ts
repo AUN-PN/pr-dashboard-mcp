@@ -49,6 +49,7 @@ export type Dashboard = {
   inProgress: WorkEntry[]
   paused: WorkItem[]
   sections: InboxSection[]
+  warnings?: string[]
 }
 
 export type DashboardState = {
