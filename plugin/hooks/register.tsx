@@ -100,6 +100,9 @@ async function setWorkStatus($: EngineInterface, pr: PrRef, status: WorkStatus):
   if (result.isError) throw new Error(textOf(result) || 'Could not update the pull request.')
 }
 
+const isBusy = (s: DashboardState) =>
+  s.pending.length > 0 || (s.isLoading && Date.now() - (s.loadingSince ?? 0) <= LOAD_TIMEOUT_MS)
+
 const isFresh = (data: Dashboard | null, maxAgeMs: number) => data !== null && Date.now() - Date.parse(data.generatedAt) < maxAgeMs
 
 async function isPaneUp($: EngineInterface): Promise<boolean> {
@@ -161,12 +164,12 @@ function createActions($: EngineInterface, features: Features): Actions {
     const { data } = await read($, dashboard)
     const next = data && items && withWork(data, items)
     if (next) await patch((s) => ({ ...s, data: next }))
-    else await refresh()
+    else if ((await read($, dashboard)).error === null) await refresh()
   }
 
   async function syncWork() {
     const current = await read($, dashboard)
-    if (!current.data || current.error !== null || current.isLoading || current.pending.length > 0) return
+    if (!current.data || isBusy(current)) return
     let items: WorkItem[]
     try {
       items = await fetchWork($)
@@ -183,7 +186,7 @@ function createActions($: EngineInterface, features: Features): Actions {
     if (live.dashboard && live.dashboard.generatedAt > (shown?.generatedAt ?? '')) await show(live.dashboard)
 
     const current = await read($, dashboard)
-    if (current.isLoading || current.pending.length > 0) return false
+    if (isBusy(current)) return false
     if (!current.data || workFingerprint(live.work) === workFingerprint(shownWork(current.data))) return true
     const next = withWork(current.data, live.work)
     if (next) await patch((s) => ({ ...s, data: next }))
@@ -293,6 +296,7 @@ export const register: Register = (on, options) => {
       isDeferred: false,
     })
     const started = await next(e)
+    await update($, dashboard, (s) => ({ ...s, isLoading: false, loadingSince: null, isQueued: false, pending: [] }))
     if (e.surface !== null || (await $.session.surfaces()).length > 0) begin($, features, openOnStart, background)
     return started
   })
@@ -300,11 +304,16 @@ export const register: Register = (on, options) => {
   on('session.attach', async ($, e, next) => {
     const attached = await next(e)
     begin($, features, openOnStart, background)
+    inBackground(createActions($, features).syncWork())
     return attached
   })
 
   on('prompt.submit', async ($, e, next) => {
-    if (background.isRunning) inBackground(createActions($, features).refreshIfStale())
+    if (background.isRunning) {
+      const actions = createActions($, features)
+      inBackground(actions.syncWork())
+      inBackground(actions.refreshIfStale())
+    }
     return next(e)
   }).catch(($, e, next) => next(e))
 
