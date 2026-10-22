@@ -2,7 +2,7 @@
 
 A **Claude Code plugin** and **MCP server** that show your open **GitHub pull requests** in a pane next to the conversation with Claude: review status, CI checks and who is working on what, grouped by what happens next: needs your review, returned to you, ready to merge, waiting for review, drafts. It also defines [**pr-work/1**](protocol/README.md), an open protocol that lets AI agents, skills and scripts mark a pull request as in progress.
 
-- **Claude Code** (terminal and the desktop app's Code tab): a one-line summary above the prompt box and a pane beside the chat.
+- **Claude Code** (terminal and the desktop app's Code tab): a one-line summary above the prompt box and a pane beside the chat, with a button that hands each pull request to Claude to review or fix, and a notification when one needs you.
 - **Any MCP client**: an MCP server Claude can ask to list, summarise and track pull requests.
 - **Anyone**: [pr-work/1](protocol/README.md), an open file protocol any skill, script or AI agent uses to mark a pull request as in progress. The dashboard shows each one with who holds it and what it is doing.
 
@@ -23,6 +23,13 @@ In the desktop app's Code tab: click **+** next to the prompt box → **Plugins*
 
 The summary bar above the prompt box shows how many pull requests are open, which one you are working on and which need attention; click it to open the pane. The pane opens when a session starts. Run `/pr-dashboard`, or ask Claude for your dashboard, to open it again.
 
+Each pull request in the pane has one Claude button:
+
+- **✦ Review** runs `/code-review` on it. The review only reads, and its findings arrive in the conversation.
+- **✦ Fix** replaces it on your own pull requests whose checks fail or that a reviewer sent back. Claude works on the branch in a separate worktree, fixes it, runs the tests and shows you the change before it pushes.
+
+You are notified when a pull request needs your review, is returned to you, or becomes ready to merge. Four or more at once arrive as one notification.
+
 The pane reloads by itself: every 5 minutes; when you open it or send a prompt and what it shows is over a minute old; and 5 and 30 seconds after Claude runs `git push` or a `gh pr` command that changes a pull request (`create`, `merge`, `close`, `reopen`, `ready`, `edit`, `review`, `comment`). A reload asked for while one runs waits for it, then runs once. **Refresh** reloads at once.
 
 No setup is needed if you are signed in to the GitHub CLI (`gh auth login`) or have `GH_TOKEN` set. The plugin settings are all optional:
@@ -34,6 +41,7 @@ No setup is needed if you are signed in to the GitHub CLI (`gh auth login`) or h
 | Repositories | All of them; set a list to limit the pane and `list_pending_prs` to those |
 | Open on start | On |
 | Summary bar | On |
+| Notifications | On |
 | AI summaries | On: one line under each of the first 20 pull requests from the smallest Claude model (the `haiku` alias, so it follows new Haiku releases), kept until the pull request changes |
 
 ### Auto mode

@@ -1,6 +1,7 @@
 import type { Elements, RenderSurface } from 'claude-code'
 import type { Dashboard, DashboardState, InboxSection, InboxSectionId, PullRequest, Summaries, WorkEntry, WorkItem } from '../types'
 import type { Actions } from './actions'
+import { canFix } from './claude'
 import { age, plural, prRef, splitTicket, USER_ACTOR } from './format'
 import { avatar, pill, skeleton } from './svg'
 import { STATUS, SURFACE, TONES, type Tone } from './theme'
@@ -9,7 +10,14 @@ export type ViewElements = Pick<Elements['desktop'], 'Box' | 'Text' | 'Button' |
   Svg?: Elements['desktop']['Svg']
 }
 
-type Ctx = { el: ViewElements; rich: boolean; actions: Actions; pending: string[]; summaries: Summaries }
+type Ctx = {
+  el: ViewElements
+  rich: boolean
+  actions: Actions
+  pending: string[]
+  summaries: Summaries
+  viewer: string | null
+}
 
 const isRich = (surface: RenderSurface, el: ViewElements) => surface !== 'terminal' && el.Svg !== undefined
 
@@ -39,8 +47,15 @@ export function renderDashboard(
   actions: Actions,
 ) {
   const { Box, Text, Button } = el
-  const ctx: Ctx = { el, rich: isRich(surface, el), actions, pending: state.pending, summaries }
   const { data, error, isLoading } = state
+  const ctx: Ctx = {
+    el,
+    rich: isRich(surface, el),
+    actions,
+    pending: state.pending,
+    summaries,
+    viewer: data?.viewer ?? null,
+  }
 
   return (
     <Box flexDirection="column" gap="lg" paddingY={1}>
@@ -173,6 +188,13 @@ function renderStats(ctx: Ctx, data: Dashboard) {
 
 const isUser = (item: WorkItem) => item.actor === USER_ACTOR
 
+type ClaudeAction = { name: 'fix' | 'review'; label: string; run: () => void }
+
+const claudeAction = (ctx: Ctx, pr: PullRequest): ClaudeAction =>
+  canFix(pr, ctx.viewer)
+    ? { name: 'fix', label: '✦ Fix', run: () => void ctx.actions.fix(pr) }
+    : { name: 'review', label: '✦ Review', run: () => void ctx.actions.review(pr) }
+
 const who = (item: WorkItem) => (isUser(item) ? 'you' : (item.label ?? item.actor))
 
 function renderFocus(ctx: Ctx, data: Dashboard) {
@@ -224,6 +246,7 @@ function renderWork(ctx: Ctx, { item, pullRequest: pr }: WorkEntry) {
   const { ticket, title } = splitTicket(pr?.title ?? '')
   const target = { ...item, title: pr?.title }
   const byline = mine ? null : [`🤖 ${who(item)}`, item.note].filter(Boolean).join(' · ')
+  const claude = pr ? claudeAction(ctx, pr) : null
 
   return (
     <Box
@@ -261,6 +284,7 @@ function renderWork(ctx: Ctx, { item, pullRequest: pr }: WorkEntry) {
           />
         )}
         <Button key={`work-summarise-${id}`} label="Summarise" onPress={() => void ctx.actions.summarise(target)} />
+        {claude && <Button key={`work-${claude.name}-${id}`} label={claude.label} onPress={claude.run} />}
         {mine && (
           <Button key="active-pause" label="Pause" dimColor={isBusy} onPress={() => void ctx.actions.setWork(item, 'paused')} />
         )}
@@ -304,7 +328,7 @@ function renderSection(ctx: Ctx, section: InboxSection, data: Dashboard) {
         </Text>
       </Box>
       {section.pullRequests.map((pr) =>
-        renderCard(ctx, pr, data.viewer, data.inProgress.filter((e) => prRef(e.item) === prRef(pr))),
+        renderCard(ctx, pr, data.inProgress.filter((e) => prRef(e.item) === prRef(pr))),
       )}
     </Box>
   )
@@ -341,7 +365,7 @@ function renderSummary(ctx: Ctx, pr: PullRequest) {
   )
 }
 
-function renderCard(ctx: Ctx, pr: PullRequest, viewer: string | null, work: WorkEntry[]) {
+function renderCard(ctx: Ctx, pr: PullRequest, work: WorkEntry[]) {
   const { Box, Text, Button, Link, Svg } = ctx.el
   const ref = prRef(pr)
   const scope = `pr-${ref}`.slice(0, 64)
@@ -350,8 +374,9 @@ function renderCard(ctx: Ctx, pr: PullRequest, viewer: string | null, work: Work
   const isMine = work.some((e) => isUser(e.item))
   const workers = work.map((e) => who(e.item)).join(', ')
   const face = avatar(pr.author ?? '?')
-  const byOther = pr.author !== null && pr.author !== viewer
+  const byOther = pr.author !== null && pr.author !== ctx.viewer
   const meta = [`${pr.repo}#${pr.number}`, ticket, byOther ? `@${pr.author}` : null, age(pr.updatedAt)].filter(Boolean).join(' · ')
+  const claude = claudeAction(ctx, pr)
 
   return (
     <Box
@@ -390,6 +415,11 @@ function renderCard(ctx: Ctx, pr: PullRequest, viewer: string | null, work: Work
             {meta}
           </Text>
           <Box flexDirection="row" gap="sm" alignItems="center" flexGrow={1} justifyContent="flex-end">
+            <Button key={`${claude.name}-${ref}`} plain onPress={claude.run}>
+              <Text color={ctx.rich ? SURFACE.accent : 'claude'} size="footnote">
+                {claude.label}
+              </Text>
+            </Button>
             {!isMine && (
               <Button
                 key={`start-${ref}`}

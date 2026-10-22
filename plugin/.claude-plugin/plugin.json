@@ -1,6 +1,6 @@
 {
   "name": "pr-dashboard",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Your open GitHub pull requests in a pane beside the chat, and an MCP server Claude can ask about them.",
   "author": {
     "name": "AUN-PN"
@@ -45,6 +45,12 @@
       "type": "boolean",
       "title": "Summary bar",
       "description": "Show a one-line pull request summary above the prompt box.",
+      "default": true
+    },
+    "notifications": {
+      "type": "boolean",
+      "title": "Notifications",
+      "description": "Notify you when a pull request needs your review, is returned to you, or is ready to merge.",
       "default": true
     },
     "ai_summaries": {
