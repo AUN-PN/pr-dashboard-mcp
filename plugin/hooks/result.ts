@@ -9,7 +9,7 @@ export function textOf(result: McpToolResult): string {
     .join('\n')
 }
 
-function isDashboard(value: unknown): value is Dashboard {
+export function isDashboard(value: unknown): value is Dashboard {
   const v = value as Partial<Dashboard> | null
   return typeof v?.generatedAt === 'string' && Array.isArray(v.sections) && Array.isArray(v.inProgress) && Array.isArray(v.paused)
 }

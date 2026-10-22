@@ -1,15 +1,15 @@
 import type { Elements, RenderSurface } from 'claude-code'
-import type { Dashboard, DashboardState, InboxSection, InboxSectionId, PullRequest, WorkEntry, WorkItem } from '../types'
+import type { Dashboard, DashboardState, InboxSection, InboxSectionId, PullRequest, Summaries, WorkEntry, WorkItem } from '../types'
 import type { Actions } from './actions'
 import { age, plural, prRef, splitTicket, USER_ACTOR } from './format'
-import { avatar, pill } from './svg'
+import { avatar, pill, skeleton } from './svg'
 import { STATUS, SURFACE, TONES, type Tone } from './theme'
 
 export type ViewElements = Pick<Elements['desktop'], 'Box' | 'Text' | 'Button' | 'Link'> & {
   Svg?: Elements['desktop']['Svg']
 }
 
-type Ctx = { el: ViewElements; rich: boolean; actions: Actions; pending: string[] }
+type Ctx = { el: ViewElements; rich: boolean; actions: Actions; pending: string[]; summaries: Summaries }
 
 const isRich = (surface: RenderSurface, el: ViewElements) => surface !== 'terminal' && el.Svg !== undefined
 
@@ -31,9 +31,15 @@ const SECTION_TONE: Record<InboxSectionId, Tone> = {
   drafts: 'draft',
 }
 
-export function renderDashboard(el: ViewElements, surface: RenderSurface, state: DashboardState, actions: Actions) {
+export function renderDashboard(
+  el: ViewElements,
+  surface: RenderSurface,
+  state: DashboardState,
+  summaries: Summaries,
+  actions: Actions,
+) {
   const { Box, Text, Button } = el
-  const ctx: Ctx = { el, rich: isRich(surface, el), actions, pending: state.pending }
+  const ctx: Ctx = { el, rich: isRich(surface, el), actions, pending: state.pending, summaries }
   const { data, error, isLoading } = state
 
   return (
@@ -46,12 +52,35 @@ export function renderDashboard(el: ViewElements, surface: RenderSurface, state:
               ? 'Loading your pull requests…'
               : 'Not loaded yet'}
         </Text>
-        <Button key="refresh" label={isLoading ? '⟳ Refreshing' : '⟳ Refresh'} onPress={() => void actions.refresh()} />
+        <Button key="refresh" label="⟳ Refresh" dimColor={isLoading} onPress={() => void actions.refresh()} />
       </Box>
       {error !== null && renderNotice(ctx, error)}
+      {data === null && error === null && renderSkeleton(ctx)}
       {data !== null && renderStats(ctx, data)}
       {data !== null && renderFocus(ctx, data)}
       {data !== null && renderSections(ctx, data)}
+    </Box>
+  )
+}
+
+function renderSkeleton({ el, rich }: Ctx) {
+  const { Box, Svg } = el
+  if (!rich || !Svg) return null
+  const bar = skeleton()
+  return (
+    <Box key="skeleton" flexDirection="column" gap="sm">
+      {[0, 1, 2].map((i) => (
+        <Box
+          key={`skeleton-${i}`}
+          borderStyle="round"
+          borderColor={SURFACE.border}
+          backgroundColor={SURFACE.card}
+          paddingX={1}
+          paddingY={1}
+        >
+          <Svg source={bar.source} alt="Loading" width={bar.width} height={bar.height} isInteractive />
+        </Box>
+      ))}
     </Box>
   )
 }
@@ -272,6 +301,19 @@ function renderStatus(ctx: Ctx, pr: PullRequest, key: string) {
   )
 }
 
+function renderSummary(ctx: Ctx, pr: PullRequest) {
+  const { Text } = ctx.el
+  const summary = ctx.summaries[prRef(pr)]
+  if (!summary || summary.status === 'failed') return null
+  const isFresh = summary.updatedAt === pr.updatedAt
+  const text = summary.status === 'ready' ? summary.text : null
+  return (
+    <Text key={`summary-${prRef(pr)}`} size="footnote" dimColor={!isFresh || text === null} wrap="wrap">
+      {text === null ? '✦ Summarising…' : `✦ ${text}`}
+    </Text>
+  )
+}
+
 function renderCard(ctx: Ctx, pr: PullRequest, viewer: string | null, work: WorkEntry[]) {
   const { Box, Text, Button, Link, Svg } = ctx.el
   const ref = prRef(pr)
@@ -283,20 +325,6 @@ function renderCard(ctx: Ctx, pr: PullRequest, viewer: string | null, work: Work
   const face = avatar(pr.author ?? '?')
   const byOther = pr.author !== null && pr.author !== viewer
   const meta = [`${pr.repo}#${pr.number}`, ticket, byOther ? `@${pr.author}` : null, age(pr.updatedAt)].filter(Boolean).join(' · ')
-
-  const buttons = (
-    <Box flexDirection="row" gap="sm" alignItems="center">
-      {!isMine && (
-        <Button
-          key={`start-${ref}`}
-          label="▶ Start"
-          dimColor={ctx.pending.includes(ref)}
-          onPress={() => void ctx.actions.setWork(pr, 'working')}
-        />
-      )}
-      <Link href={pr.url}>↗</Link>
-    </Box>
-  )
 
   return (
     <Box
@@ -318,6 +346,7 @@ function renderCard(ctx: Ctx, pr: PullRequest, viewer: string | null, work: Work
         <Button key={`summarise-${ref}`} plain onPress={() => void ctx.actions.summarise(pr)}>
           {title}
         </Button>
+        {renderSummary(ctx, pr)}
         <Box flexDirection="row" gap="xs" alignItems="center" flexWrap="wrap">
           {renderStatus(ctx, pr, `status-${ref}`)}
           {isWorking && (
@@ -333,15 +362,23 @@ function renderCard(ctx: Ctx, pr: PullRequest, viewer: string | null, work: Work
           <Text dimColor size="footnote" wrap="truncate-end">
             {meta}
           </Text>
+          <Box flexDirection="row" gap="sm" alignItems="center" flexGrow={1} justifyContent="flex-end">
+            {!isMine && (
+              <Button
+                key={`start-${ref}`}
+                plain
+                dimColor={ctx.pending.includes(ref)}
+                onPress={() => void ctx.actions.setWork(pr, 'working')}
+              >
+                <Text color={ctx.rich ? SURFACE.accent : 'claude'} size="footnote">
+                  ▶ Start
+                </Text>
+              </Button>
+            )}
+            <Link href={pr.url}>↗</Link>
+          </Box>
         </Box>
       </Box>
-      {ctx.rich ? (
-        <Box display="none" hover={{ scope, display: 'flex' }}>
-          {buttons}
-        </Box>
-      ) : (
-        buttons
-      )}
     </Box>
   )
 }

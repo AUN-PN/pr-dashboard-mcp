@@ -26,6 +26,7 @@ No setup is needed if you are signed in to the GitHub CLI (`gh auth login`). The
 | Repositories | All of them; set a list to limit the pane and `list_pending_prs` to those |
 | Open on start | On |
 | Summary bar | On |
+| AI summaries | On: one line under each pull request from the smallest Claude model (the `haiku` alias, so it follows new Haiku releases), kept until the pull request changes |
 
 ### Auto mode
 

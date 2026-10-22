@@ -34,3 +34,15 @@ export function pill(label: string, tone: Tone, dot = true): { source: string; w
     source: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" rx="${height / 2}" fill="${fg}" fill-opacity="0.16"/>${dot ? `<circle cx="${pad + 3}" cy="${height / 2}" r="3" fill="${fg}"/>` : ''}<text x="${textX}" y="${height / 2}" dy=".35em" font-family="${FONT}" font-size="11" font-weight="600" fill="${fg}">${escape(label)}</text></svg>`,
   }
 }
+
+export function skeleton(width = 320, height = 44): { source: string; width: number; height: number } {
+  const { fg } = TONES.neutral
+  const pulse = '<animate attributeName="opacity" values="0.10;0.24;0.10" dur="1.4s" repeatCount="indefinite"/>'
+  const bar = (y: number, w: number, h: number) =>
+    `<rect x="40" y="${y}" width="${w}" height="${h}" rx="${h / 2}" fill="${fg}" opacity="0.14">${pulse}</rect>`
+  return {
+    width,
+    height,
+    source: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><circle cx="15" cy="15" r="15" fill="${fg}" opacity="0.14">${pulse}</circle>${bar(4, width * 0.7, 10)}${bar(24, width * 0.45, 8)}</svg>`,
+  }
+}

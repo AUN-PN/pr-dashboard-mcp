@@ -1,6 +1,6 @@
 {
   "name": "pr-dashboard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Your open GitHub pull requests in a pane beside the chat, and an MCP server Claude can ask about them.",
   "author": {
     "name": "AUN-PN"
@@ -26,7 +26,7 @@
     "watched_repos": {
       "type": "string",
       "title": "Repositories",
-      "description": "owner/repo, separated by commas. Leave empty to show every repository where you opened, reviewed or were asked to review a pull request in the last 30 days.",
+      "description": "owner/repo, separated by commas. Leave empty to show pull requests from every repository.",
       "default": ""
     },
     "open_on_start": {
@@ -39,6 +39,12 @@
       "type": "boolean",
       "title": "Summary bar",
       "description": "Show a one-line pull request summary above the prompt box.",
+      "default": true
+    },
+    "ai_summaries": {
+      "type": "boolean",
+      "title": "AI summaries",
+      "description": "Write a one-line summary under each pull request with the smallest Claude model (Haiku). Summaries are kept until the pull request changes.",
       "default": true
     }
   },

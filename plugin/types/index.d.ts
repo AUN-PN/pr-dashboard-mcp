@@ -58,8 +58,15 @@ export type DashboardState = {
   pending: string[]
 }
 
+export type Summary =
+  | { status: 'pending'; updatedAt: string }
+  | { status: 'ready'; updatedAt: string; text: string }
+  | { status: 'failed'; updatedAt: string }
+
+export type Summaries = Record<string, Summary>
+
 declare module 'claude-code' {
   interface PluginState {
-    'pr-dashboard': { dashboard: DashboardState }
+    'pr-dashboard': { dashboard: DashboardState; summaries: Summaries }
   }
 }
